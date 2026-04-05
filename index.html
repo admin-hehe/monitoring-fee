@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fee Monitoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .table-wrapper { overflow-x: auto; border-radius: 1.5rem; }
+        @keyframes spin-sync { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin-custom { animation: spin-sync 0.8s linear infinite; }
+        .row-animate { animation: fadeIn 0.4s ease-out forwards; opacity: 0; }
+        @keyframes fadeIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        #toast.show { bottom: 2.5rem; opacity: 1; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Dark Mode Utility */
+        .dark .bg-dark-surface { background-color: #0f172a; }
+        .dark .bg-dark-card { background-color: #1e293b; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-dark-surface min-h-screen p-4 md:p-8 transition-colors duration-500 text-slate-900 dark:text-slate-100">
+<div id="topProgress" class="fixed top-0 left-0 w-0 h-1 bg-indigo-600 z-[999] transition-all duration-300 ease-out shadow-[0_0_10px_rgba(79,70,229,0.8)]"></div>
+
+<div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 backdrop-blur-md text-white px-8 py-4 rounded-2xl shadow-2xl opacity-0 transition-all duration-500 pointer-events-none z-[200] flex items-center justify-center gap-3 font-bold text-sm border border-white/10 min-w-[280px] md:min-w-[350px]">
+    <span id="toastIcon"></span>
+    <span id="toastMsg" class="text-center"></span>
+</div>
+
+<div class="max-w-7xl mx-auto space-y-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-3xl font-extrabold tracking-tight dark:text-white">Fee Monitoring</h2>
+            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Monitoring Progres & Dokumentasi Task</p>
+        </div>
+        <button onclick="loadData()" class="hidden md:flex bg-white dark:bg-dark-card text-gray-700 dark:text-slate-200 font-bold py-3 px-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition items-center gap-3 active:scale-95">
+            <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-500"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+            <span>Refresh Data</span>
+        </button>
+    </div>
+    
+    <div id="tableContainer" class="hidden space-y-6">
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="relative group md:col-span-1">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </span>
+                <input type="text" id="searchInput" onkeyup="handleFilter()" placeholder="Cari kegiatan atau vendor..." class="w-full bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-4 pl-12 pr-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm font-semibold" autocomplete="off">
+            </div>
+            
+            <div class="relative md:col-span-1" id="picFilterContainer">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </span>
+                <input type="text" id="filterPic" autocomplete="off" placeholder="Cari PIC..." onclick="togglePicList(true)" onfocus="this.select()" oninput="handlePicInput(this.value)" onkeydown="handlePicKeydown(event)" class="w-full bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-4 pl-12 pr-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm font-bold">
+                <div id="picDropdown" class="hidden absolute z-50 w-full mt-2 bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-lg">
+                    <div id="picListItems" class="p-2 space-y-1"></div>
+                </div>
+            </div>
+
+            <select id="filterStatus" onchange="handleFilter()" class="bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-4 font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer">
+                <option value="">Semua Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Pengajuan">Pengajuan</option>
+                <option value="Validate">Validate</option>
+                <option value="Done">Done</option>
+            </select>
+        </div>
+
+        <div class="hidden md:block table-wrapper shadow-2xl bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                <thead class="bg-slate-50/50 dark:bg-slate-800/50">
+                    <tr>
+                        <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Node</th>
+                        <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">PIC & Status</th>
+                        <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Kegiatan</th>
+                        <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Vendor</th>
+                        <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Harga</th>
+                        <th class="px-6 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Dokumen</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody" class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300"></tbody>
+            </table>
+        </div>
+
+        <div class="md:hidden mt-4 shadow-xl rounded-[1.5rem] bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div id="mobileDataList" class="divide-y divide-slate-100 dark:divide-slate-800">
+                </div>
+        </div>	
+
+        <div class="flex items-center justify-between px-2">
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Halaman <span id="currentPageDisplay" class="font-bold text-indigo-600">1</span></p>
+            <div class="flex gap-2">
+                <button id="prevPage" onclick="changePage(-1)" class="px-6 py-2 rounded-xl bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-700 disabled:opacity-30 dark:text-white font-bold transition hover:bg-slate-50 active:scale-95">Prev</button>
+                <button id="nextPage" onclick="changePage(1)" class="px-6 py-2 rounded-xl bg-white dark:bg-dark-card border border-slate-200 dark:border-slate-700 disabled:opacity-30 dark:text-white font-bold transition hover:bg-slate-50 active:scale-95">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="adminModal" class="fixed inset-0 z-[110] hidden overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen p-4 md:p-10">
+        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-md" onclick="closeAdminModal()"></div>
+        <div class="relative bg-white dark:bg-dark-card w-full max-w-4xl rounded-3xl md:rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div class="grid grid-cols-1 lg:grid-cols-5 h-full">
+                <div class="lg:col-span-3 p-6 md:p-12 space-y-6 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-4">
+                        <div class="p-3 bg-indigo-600 rounded-2xl text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <div>
+                            <h4 id="modalId" class="text-3xl font-black text-indigo-600 tracking-tighter">FEE-XXXX</h4>
+                            <p id="modalPic" class="text-sm font-bold text-slate-400 uppercase tracking-widest italic"></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nama Kegiatan</label>
+                            <p id="infoKegiatan" class="font-bold text-slate-800 dark:text-slate-100"></p>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Brand</label>
+                            <p id="infoBrand" class="font-bold text-slate-800 dark:text-slate-100 uppercase"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Detail Vendor</label>
+                            <p id="infoVendor" class="font-black text-indigo-600 text-lg"></p>
+                            <p id="infoKontak" class="text-xs font-medium text-slate-500"></p>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Kode Budget</label>
+                            <p id="infoKode" class="font-bold text-slate-800 dark:text-slate-100 font-mono"></p>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Biaya</label>
+                            <p id="infoHarga" class="font-black text-emerald-600 text-xl italic"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 p-8 lg:p-12 bg-slate-50/50 dark:bg-slate-800/20 relative">
+                    <button onclick="closeAdminModal()" class="absolute top-6 right-6 p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                    <h5 class="text-sm font-black mb-8 uppercase tracking-widest text-slate-700 dark:text-slate-300">Status Administrasi</h5>
+                    <div class="space-y-4"> 
+                        <div class="p-5 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-sm">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status Progres</label>
+                                <p id="viewStatus" class="text-sm font-bold"></p>
+                            </div>
+                        </div>
+                        <div class="p-5 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-sm">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tanggal Transfer</label>
+                                <p id="viewTglTf" class="text-sm font-bold"></p>
+                            </div>
+                        </div>
+                        <div class="p-5 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-sm">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bukti Transfer</span>
+                            <div id="viewBuktiTf"></div>
+                        </div>
+                        <div id="docPreviewContainer" class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500">Dokumentasi:</span>
+                            <div id="docPlaceholder"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js" defer></script>
+
+</body>
+</html>
