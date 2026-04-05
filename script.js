@@ -1,5 +1,5 @@
 const WEB_APP_URL = "/api"; 
-const GITHUB_UPLOAD_PAGE = "https://admin-hehe.github.io/upload-fee/";
+const GITHUB_UPLOAD_PAGE = "https://upload-fee.pages.dev/";
 
 // Konfigurasi Tailwind (Dark Mode & Custom Colors)
 tailwind.config = {
